@@ -20,7 +20,8 @@ uv compatible python script with inlinde dependencies
 - [x] add function that creates "daily" note
       copy all unfinished todo items from the last previous note
       add date of last daily note to todo items without date
-- [ ] add api endpoint that can accept notes
+- [x] add api endpoint that can accept notes
       add content of request to today note
+      should use fastapi and add the body of the request to the daily note, seperated by `---`
 - [x] add watcher that will automatically create the daily note after midnight
 - [x] add cleanup function that will check the last before today note for anything new compared to today and delete that note if it has no unique information

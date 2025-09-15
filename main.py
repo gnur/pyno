@@ -1,19 +1,54 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = ["schedule"]
+# dependencies = ["schedule", "fastapi", "uvicorn[standard]"]
 # ///
 
 import os
 import re
 import sys
 import time
+import threading
 from datetime import date
 from pathlib import Path
 
 import schedule
+import uvicorn
+from fastapi import FastAPI, Request
 
-# The base directory for notes.
-BASE_DIR = Path(os.path.expanduser("~/ll"))
+# The base directory for notes. Can be set with the PYNO_DIR environment variable.
+BASE_DIR = Path(os.path.expanduser(os.environ.get("PYNO_DIR", "~/ll")))
+
+
+def get_today_note_path() -> Path:
+    """Returns the path to today's daily note."""
+    today = date.today()
+    year = today.strftime("%Y")
+    month = today.strftime("%m")
+    today_str = today.strftime("%Y-%m-%d")
+    note_dir = BASE_DIR / year / month
+    return note_dir / f"{today_str}.md"
+
+
+app = FastAPI()
+
+
+@app.post("/note")
+async def add_note(request: Request):
+    """Adds the request body to the daily note."""
+    body = await request.body()
+    content_to_add = body.decode("utf-8")
+
+    today_filepath = get_today_note_path()
+
+    if not today_filepath.exists():
+        print("Daily note does not exist, creating it.")
+        create_daily_note()
+
+    with today_filepath.open("a") as f:
+        f.write("\n\n---\n\n" + content_to_add)
+
+    print(f"Content added to daily note: {today_filepath}")
+    return {"status": "success", "message": f"Content added to {today_filepath}"}
 
 
 def create_daily_note() -> None:
@@ -22,15 +57,8 @@ def create_daily_note() -> None:
     - Copies all unfinished todo items from the last previous note.
     - Adds the date of the last daily note to todo items without a date.
     """
-    today = date.today()
-    today_str = today.strftime("%Y-%m-%d")
-    year = today.strftime("%Y")
-    month = today.strftime("%m")
-
-    note_dir = BASE_DIR / year / month
-    note_dir.mkdir(parents=True, exist_ok=True)
-
-    today_filepath = note_dir / f"{today_str}.md"
+    today_filepath = get_today_note_path()
+    today_filepath.parent.mkdir(parents=True, exist_ok=True)
 
     if today_filepath.exists():
         print(f"Note for today already exists: {today_filepath}")
@@ -41,11 +69,11 @@ def create_daily_note() -> None:
     daily_notes = sorted(list(BASE_DIR.glob("????/??/????-??-??.md")))
 
     # Exclude today's note if it somehow got in the list (it shouldn't if we check for existence first)
-    daily_notes = [p for p in daily_notes if p.name != f"{today_str}.md"]
+    daily_notes = [p for p in daily_notes if p.name != today_filepath.name]
 
     last_note_path = daily_notes[-1] if daily_notes else None
 
-    content = f"# {today_str}\n\n## todo\n"
+    content = f"# {today_filepath.stem}\n\n## todo\n"
 
     todos = []
     if last_note_path:
@@ -99,21 +127,17 @@ def cleanup_last_note() -> None:
     - Unfinished todo items ('- [ ] ...').
     - Empty lines.
     """
-    today = date.today()
-    today_str = today.strftime("%Y-%m-%d")
-
-    # Find all daily notes
-    daily_notes = sorted(list(BASE_DIR.glob("????/??/????-??-??.md")))
-
-    # Find today's note path to make sure it exists.
-    today_note_path = BASE_DIR / today.strftime("%Y") / today.strftime("%m") / f"{today_str}.md"
+    today_note_path = get_today_note_path()
     if not today_note_path.exists():
         # This can happen if the script is run with other arguments in the future.
         print("Today's note does not exist, skipping cleanup.")
         return
 
+    # Find all daily notes
+    daily_notes = sorted(list(BASE_DIR.glob("????/??/????-??-??.md")))
+
     # Get the last note before today
-    daily_notes_before_today = [p for p in daily_notes if p.name < f"{today_str}.md"]
+    daily_notes_before_today = [p for p in daily_notes if p.name < today_note_path.name]
 
     if not daily_notes_before_today:
         print("No previous daily note to clean up.")
@@ -166,16 +190,39 @@ def start_watcher() -> None:
         time.sleep(60)
 
 
+def start_api_server() -> None:
+    """Starts the FastAPI server."""
+    port = int(os.environ.get("PYNO_PORT", 8293))
+    print(f"Starting API server on http://0.0.0.0:{port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
+def serve() -> None:
+    """Runs the watcher in the background and starts the API server."""
+    run_once()
+    watcher_thread = threading.Thread(target=start_watcher, daemon=True)
+    watcher_thread.start()
+    start_api_server()
+
 def main() -> None:
     """
     Main entry point for the script.
 
     Run without arguments to create today's note.
     Run with 'watch' to start the scheduler.
+    Run with 'api' to start the API server.
+    Run with 'serve' to run both the watcher and API server.
     """
-    if len(sys.argv) > 1 and sys.argv[1] == "watch":
-        run_once()
-        start_watcher()
+    if len(sys.argv) > 1:
+        command = sys.argv[1]
+        if command == "watch":
+            run_once()
+            start_watcher()
+        elif command == "api":
+            start_api_server()
+        elif command == "serve":
+            serve()
+        else:
+            run_once()
     else:
         run_once()
 
