@@ -1,3 +1,5 @@
+#!/usr/bin/env -S uv run --script
+# 
 # /// script
 # requires-python = ">=3.13"
 # dependencies = ["schedule", "fastapi", "uvicorn[standard]"]
@@ -5,7 +7,7 @@
 
 import os
 import re
-import sys
+import argparse
 import time
 import threading
 from datetime import date
@@ -207,24 +209,43 @@ def main() -> None:
     """
     Main entry point for the script.
 
-    Run without arguments to create today's note.
+    Run without arguments to show help.
     Run with 'watch' to start the scheduler.
     Run with 'api' to start the API server.
     Run with 'serve' to run both the watcher and API server.
     """
-    if len(sys.argv) > 1:
-        command = sys.argv[1]
-        if command == "watch":
+    parser = argparse.ArgumentParser(
+        description="A script to manage daily notes.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "command",
+        nargs="?",
+        choices=["once", "watch", "api", "serve"],
+        help=(
+            "The command to run. "
+            "'once': Create today's note and cleanup previous. "
+            "'watch': Run once and start the scheduler. "
+            "'api': Start the API server. "
+            "'serve': Run once and start both watcher and API server."
+        ),
+    )
+    args = parser.parse_args()
+
+    if not args.command:
+        parser.print_help()
+        return
+
+    match args.command:
+        case "once":
+            run_once()
+        case "watch":
             run_once()
             start_watcher()
-        elif command == "api":
+        case "api":
             start_api_server()
-        elif command == "serve":
+        case "serve":
             serve()
-        else:
-            run_once()
-    else:
-        run_once()
 
 
 if __name__ == "__main__":

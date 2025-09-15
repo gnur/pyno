@@ -1,0 +1,23 @@
+[Unit]
+Description=pyno service
+After=network.target
+
+[Service]
+# Run as the specified user and group.
+User=erwin
+Group=erwin
+
+WorkingDirectory=/home/erwin/ll
+
+ExecStart=uv run /opt/pyno/main.py serve
+Environment="PYNO_DIR=/home/erwin/ll"
+Restart=always
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/erwin/ll
+ReadWritePaths=/home/erwin/.cache/uv
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

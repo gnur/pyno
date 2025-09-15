@@ -1,0 +1,21 @@
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  GREETING: Hello, World!
+  TARGET: imp
+
+tasks:
+  default:
+    cmds:
+      - echo "{{.GREETING}}"
+    silent: true
+
+  deploy:
+    desc: "Deploy pyno to the target server"
+    cmds:
+      - scp main.py {{.TARGET}}:/opt/pyno/main.py
+      - scp pyno.service {{.TARGET}}:/opt/pyno/pyno.service
+      - ssh {{.TARGET}} "sudo cp /opt/pyno/pyno.service /etc/systemd/system/pyno.service && sudo systemctl daemon-reload && sudo systemctl enable --now pyno.service"
+      - ssh {{.TARGET}} "sudo systemctl restart pyno.service"
