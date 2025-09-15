@@ -83,9 +83,72 @@ def create_daily_note() -> None:
     print(f"Created daily note: {today_filepath}")
 
 
+def cleanup_last_note() -> None:
+    """
+    Deletes the last daily note if it contains no unique information.
+
+    Unique information is any content other than:
+    - The note's date heading.
+    - The '## todo' heading.
+    - Completed todo items ('- [x] ...').
+    - Unfinished todo items ('- [ ] ...').
+    - Empty lines.
+    """
+    today = date.today()
+    today_str = today.strftime("%Y-%m-%d")
+
+    # Find all daily notes
+    daily_notes = sorted(list(BASE_DIR.glob("????/??/????-??-??.md")))
+
+    # Find today's note path to make sure it exists.
+    today_note_path = BASE_DIR / today.strftime("%Y") / today.strftime("%m") / f"{today_str}.md"
+    if not today_note_path.exists():
+        # This can happen if the script is run with other arguments in the future.
+        print("Today's note does not exist, skipping cleanup.")
+        return
+
+    # Get the last note before today
+    daily_notes_before_today = [p for p in daily_notes if p.name < f"{today_str}.md"]
+
+    if not daily_notes_before_today:
+        print("No previous daily note to clean up.")
+        return
+
+    last_note_path = daily_notes_before_today[-1]
+
+    try:
+        last_note_content = last_note_path.read_text()
+    except Exception as e:
+        print(f"Error reading last note {last_note_path}: {e}")
+        return
+
+    unique_content = []
+    for line in last_note_content.splitlines():
+        stripped_line = line.strip()
+        if not stripped_line:
+            continue  # Ignore empty lines
+        if stripped_line.startswith(f"# {last_note_path.stem}"):
+            continue  # Ignore date heading
+        if stripped_line == "## todo":
+            continue  # Ignore todo heading
+        if stripped_line.startswith("- [x]"):
+            continue  # Ignore completed todos
+        if re.match(r"^\s*-\s*\[\s*\]", stripped_line):
+            continue  # Ignore unfinished todos
+
+        unique_content.append(line)
+
+    if not unique_content:
+        print(f"No unique information found in {last_note_path}. Deleting note.")
+        last_note_path.unlink()
+    else:
+        print(f"Found unique information in {last_note_path}. Keeping note.")
+
+
 def main() -> None:
-    # For now, the main function will just call create_daily_note()
+    # Coordinates daily note operations.
     create_daily_note()
+    cleanup_last_note()
 
 
 if __name__ == "__main__":

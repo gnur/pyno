@@ -23,4 +23,4 @@ uv compatible python script with inlinde dependencies
 - [ ] add api endpoint that can accept notes
       add content of request to today note
 - [ ] add watcher that will automatically create the daily note after midnight
-      if the last daily note only has a todo list that is the same as the daily note before it should be automatically be deleted because it has no new content
+- [x] add cleanup function that will check the last before today note for anything new compared to today and delete that note if it has no unique information
