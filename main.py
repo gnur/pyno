@@ -1,15 +1,20 @@
 # /// script
 # requires-python = ">=3.13"
-# dependencies = []
+# dependencies = ["schedule"]
 # ///
 
 import os
 import re
+import sys
+import time
 from datetime import date
 from pathlib import Path
 
+import schedule
+
 # The base directory for notes.
 BASE_DIR = Path(os.path.expanduser("~/ll"))
+
 
 def create_daily_note() -> None:
     """
@@ -34,14 +39,14 @@ def create_daily_note() -> None:
     # Find the last daily note
     # The pattern should match yyyy-mm-dd.md in a yyyy/mm directory
     daily_notes = sorted(list(BASE_DIR.glob("????/??/????-??-??.md")))
-    
+
     # Exclude today's note if it somehow got in the list (it shouldn't if we check for existence first)
     daily_notes = [p for p in daily_notes if p.name != f"{today_str}.md"]
 
     last_note_path = daily_notes[-1] if daily_notes else None
 
     content = f"# {today_str}\n\n## todo\n"
-    
+
     todos = []
     if last_note_path:
         last_note_date_str = last_note_path.stem
@@ -72,10 +77,10 @@ def create_daily_note() -> None:
                     else:  # handle empty todo
                         new_line = f"{prefix.rstrip()} {last_note_date_str}:"
                     todos.append(new_line)
-    
+
     # Sort todos in reverse order, as in the bash script
     todos.sort(reverse=True)
-    
+
     if todos:
         content += "\n".join(todos)
 
@@ -145,10 +150,34 @@ def cleanup_last_note() -> None:
         print(f"Found unique information in {last_note_path}. Keeping note.")
 
 
-def main() -> None:
-    # Coordinates daily note operations.
+def run_once() -> None:
+    """Creates the daily note and cleans up the previous one."""
+    print("Running daily job: creating note and cleaning up...")
     create_daily_note()
     cleanup_last_note()
+
+
+def start_watcher() -> None:
+    """Runs the daily note creation automatically after midnight."""
+    print("Starting watcher...")
+    schedule.every().day.at("00:10").do(run_once)
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
+
+
+def main() -> None:
+    """
+    Main entry point for the script.
+
+    Run without arguments to create today's note.
+    Run with 'watch' to start the scheduler.
+    """
+    if len(sys.argv) > 1 and sys.argv[1] == "watch":
+        run_once()
+        start_watcher()
+    else:
+        run_once()
 
 
 if __name__ == "__main__":
