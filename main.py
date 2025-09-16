@@ -36,7 +36,7 @@ app = FastAPI()
 
 @app.post("/note")
 async def add_note(request: Request):
-    """Adds the request body to the daily note."""
+    """Adds the request body to the daily note, avoiding duplicates."""
     body = await request.body()
     content_to_add = body.decode("utf-8")
 
@@ -45,6 +45,12 @@ async def add_note(request: Request):
     if not today_filepath.exists():
         print("Daily note does not exist, creating it.")
         create_daily_note()
+
+    with today_filepath.open("r") as f:
+        if content_to_add in f.read():
+            message = "Content already present in daily note."
+            print(message)
+            return {"status": "skipped", "message": message}
 
     with today_filepath.open("a") as f:
         f.write("\n\n---\n\n" + content_to_add)
