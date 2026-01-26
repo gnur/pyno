@@ -9,12 +9,11 @@ Group=erwin
 
 WorkingDirectory=/home/erwin/ll
 
-ExecStart=uv run /opt/pyno/main.py serve
-Environment="PYNO_DIR=/home/erwin/ll"
+ExecStart=uv run /opt/pyno/main.py api
 Restart=always
 ProtectSystem=full
 ProtectHome=read-only
-ReadWritePaths=/home/erwin/ll
+ReadWritePaths=/home/erwin/obsidian
 ReadWritePaths=/home/erwin/.cache/uv
 NoNewPrivileges=true
 PrivateTmp=true
