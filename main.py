@@ -38,13 +38,13 @@ class PoopEntry(BaseModel):
 async def add_poop(entry: PoopEntry):
     """Records a poop entry to an Obsidian markdown file with YAML frontmatter."""
     now = datetime.now()
-    timestamp = now.isoformat()
+    timestamp = now.isoformat(timespec="seconds")
 
     # Remove newlines from location
     loc = entry.loc.replace("\n", " ").replace("\r", " ")
 
     data = {
-        "timestamp": timestamp,
+        "timestamp": f"{timestamp}Z",
         "location": loc,
         "wipes": entry.wipes,
         "size": entry.size,
@@ -94,6 +94,7 @@ def start_api_server() -> None:
     port = int(os.environ.get("PYNO_PORT", 8293))
     print(f"Starting API server on http://0.0.0.0:{port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 def main() -> None:
     start_api_server()
