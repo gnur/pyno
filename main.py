@@ -13,15 +13,17 @@ import threading
 from datetime import date, datetime
 from pathlib import Path
 
+import json
 import uvicorn
 import yaml
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from pydantic import BaseModel
 
 # The base directory for notes. Can be set with the PYNO_DIR environment variable.
 BASE_DIR = Path("/home/erwin/obsidian/")
 DRAFTS_DIR = BASE_DIR / "0 - drafts"
 POOPS_DIR = BASE_DIR / "2 - prive" / "poops"
+WEBHOOK_DIR = BASE_DIR / "4 - webhook"
 
 
 app = FastAPI()
@@ -33,6 +35,36 @@ class PoopEntry(BaseModel):
     size: str
     bristol: str
 
+@app.post("/webhook/{source}")
+async def log_webhook(source: str, request: Request, type: str = Query(default="webhook")):
+    """Records a webhook payload to an Obsidian markdown file with YAML frontmatter."""
+    now = datetime.now()
+    timestamp = now.isoformat(timespec="seconds")
+
+    body = await request.json()
+
+    data = {
+        "timestamp": f"{timestamp}Z",
+        "source": source,
+        "type": type,
+    }
+
+    subdir = WEBHOOK_DIR / str(now.year) / f"{now.month:02d}" / f"{now.day:02d}"
+    subdir.mkdir(parents=True, exist_ok=True)
+
+    filename = f"{source}-{now.hour:02d}:{now.minute:02d}:{now.second:02d}.md"
+    filepath = subdir / filename
+
+    with filepath.open("w") as f:
+        f.write("---\n")
+        yaml.dump(data, f, default_flow_style=False)
+        f.write("---\n\n")
+        f.write("```json\n")
+        f.write(json.dumps(body, indent=2))
+        f.write("\n```\n")
+
+    print(f"Webhook entry saved to: {filepath}")
+    return {"status": "success", "message": f"Webhook entry saved to {filepath}"}
 
 @app.post("/poop")
 async def add_poop(entry: PoopEntry):
