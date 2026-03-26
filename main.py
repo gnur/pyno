@@ -6,11 +6,7 @@
 # ///
 
 import os
-import re
-import argparse
-import time
-import threading
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 
 import json
@@ -35,18 +31,30 @@ class PoopEntry(BaseModel):
     size: str
     bristol: str
 
+
 @app.post("/webhook/{source}")
-async def log_webhook(source: str, request: Request, type: str = Query(default="webhook")):
+async def log_webhook(
+    source: str, request: Request, typ: str = Query(default="webhook")
+):
     """Records a webhook payload to an Obsidian markdown file with YAML frontmatter."""
     now = datetime.now()
     timestamp = now.isoformat(timespec="seconds")
 
-    body = await request.json()
+    body_text = "<empty>"
+    body_lang = ""
+
+    try:
+        body = await request.json()
+        body_text = json.dumps(body, indent=2)
+        body_lang = "json"
+    except Exception:
+        body_bytes = await request.body()
+        body_text = body_bytes.decode("utf-8")
 
     data = {
         "timestamp": f"{timestamp}Z",
         "source": source,
-        "type": type,
+        "type": typ,
     }
 
     subdir = WEBHOOK_DIR / str(now.year) / f"{now.month:02d}" / f"{now.day:02d}"
@@ -59,12 +67,16 @@ async def log_webhook(source: str, request: Request, type: str = Query(default="
         f.write("---\n")
         yaml.dump(data, f, default_flow_style=False)
         f.write("---\n\n")
-        f.write("```json\n")
-        f.write(json.dumps(body, indent=2))
-        f.write("\n```\n")
+        f.write(f"```{body_lang}\n")
+        f.write(body_text)
+        f.write("\n```\n\n")
+        f.write("```yaml\n")
+        f.write(yaml.dump(dict(request.headers), default_flow_style=False))
+        f.write("```\n")
 
     print(f"Webhook entry saved to: {filepath}")
-    return {"status": "success", "message": f"Webhook entry saved to {filepath}"}
+    return {"status": "success", "message": f"Webhook entry saved to {filename}"}
+
 
 @app.post("/poop")
 async def add_poop(entry: PoopEntry):
